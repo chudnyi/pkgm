@@ -252,7 +252,7 @@ async function shim(args: string[], basePath: string) {
         const range = args_pkgs[pkg.pkg.project];
         const arg = `${pkg.pkg.project}${`${range}` == "*" ? "" : `${range}`}`;
 
-        const shim = `#!${interpreter} --shebang --quiet +${arg} -- ${name}`;
+        const shim = `#!${interpreter} --shebang --quiet +${arg} -- ${name} "$@"\n`;
 
         if (existsSync(join(basePath, "bin", name))) {
           await Deno.remove(join(basePath, "bin", name));
