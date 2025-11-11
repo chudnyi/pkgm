@@ -90,3 +90,37 @@ tasks:
       - pkgx semverator satisfies '<1.19' "$(/tmp/test_prefix/bin/hyperfine --version | cut -f 2 -d ' ')"
       - ./pkgm.ts update
       - pkgx semverator satisfies '>=1.19' "$(/tmp/test_prefix/bin/hyperfine --version | cut -f 2 -d ' ')"
+  
+  upstream-init:
+    desc: Initialize upstream remote repository
+    cmds:
+      - git remote add upstream https://github.com/pkgxdev/pkgm.git
+      - echo "Upstream remote added successfully. You can verify with 'git remote -v'"
+  
+  upstream-sync:
+    desc: Fetch and merge changes from upstream repository
+    cmds:
+      - git fetch upstream
+      - git merge upstream/main
+      - echo "Changes from upstream have been merged. Please review and commit if necessary."
+  
+  upstream-rebase:
+    desc: Fetch and rebase changes from upstream repository
+    cmds:
+      - git fetch upstream
+      - git rebase upstream/main
+      - echo "Changes from upstream have been rebased. Please review and force push if necessary."
+  
+  upstream-check:
+    desc: Check for differences between local and upstream repositories
+    cmds:
+      - git fetch upstream
+      - git log --oneline --left-right --graph --cherry-pick --boundary HEAD...upstream/main
+  
+  upstream-status:
+    desc: Show the status of local branch compared to upstream
+    cmds:
+      - git fetch upstream
+      - git status
+      - echo "Local branch status compared to upstream:"
+      - git rev-list --left-right --count HEAD...upstream/main
