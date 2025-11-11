@@ -252,7 +252,7 @@ async function shim(args: string[], basePath: string) {
         const range = args_pkgs[pkg.pkg.project];
         const arg = `${pkg.pkg.project}${`${range}` == "*" ? "" : `${range}`}`;
 
-        const shim = `#!${interpreter} --shebang --quiet +${arg} -- ${name} "$@"\n`;
+        const shim = `#!${interpreter} --shebang --quiet +${arg} -- ${name}`;
 
         if (existsSync(join(basePath, "bin", name))) {
           await Deno.remove(join(basePath, "bin", name));
@@ -295,7 +295,8 @@ async function query_pkgx(
   set("PKGX_DIST_URL");
   set("XDG_DATA_HOME");
 
-  const needs_sudo_backwards = install_prefix().string == "/usr/local" && !Deno.env.get("PKGM_PREFIX");
+  const needs_sudo_backwards = install_prefix().string == "/usr/local" &&
+    !Deno.env.get("PKGM_PREFIX");
   let cmd = needs_sudo_backwards ? "/usr/bin/sudo" : pkgx;
   if (needs_sudo_backwards) {
     if (!Deno.env.get("SUDO_USER")) {
@@ -520,7 +521,10 @@ function get_pkgx() {
 
 async function* ls() {
   for (
-    const path of [new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs"), Path.home().join(".local/pkgs")]
+    const path of [
+      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs"),
+      Path.home().join(".local/pkgs"),
+    ]
   ) {
     if (!path.isDirectory()) continue;
     const dirs = [path];
@@ -565,7 +569,11 @@ async function uninstall(arg: string) {
         `%c! rerun without \`sudo\` to uninstall ~/.local/pkgs/${found.project}`,
         "color:yellow",
       );
-    } else if (new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(found.project).isDirectory()) {
+    } else if (
+      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(
+        found.project,
+      ).isDirectory()
+    ) {
       const prefix = Deno.env.get("PKGM_PREFIX") || "/usr/local";
       console.error(
         `%c! rerun as \`sudo\` to uninstall ${prefix}/pkgs/${found.project}`,
@@ -634,10 +642,8 @@ function writable(path: string) {
 
 async function outdated() {
   const pkgs: Installation[] = [];
-  for await (const pkg of walk_pkgs(new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs"))) {
-    pkgs.push(pkg);
-  }
-  for await (const pkg of walk_pkgs(Path.home().join(".local/pkgs"))) {
+  const root = install_prefix();
+  for await (const pkg of walk_pkgs(root.join("pkgs"))) {
     pkgs.push(pkg);
   }
 
@@ -724,7 +730,9 @@ async function update() {
     const pkg = utils.pkg.parse(pkgspec);
     console.log(
       "updating:",
-      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(pkg.project),
+      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(
+        pkg.project,
+      ),
       "to",
       pkg.constraint.single(),
     );
