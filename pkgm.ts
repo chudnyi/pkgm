@@ -520,23 +520,18 @@ function get_pkgx() {
 }
 
 async function* ls() {
-  for (
-    const path of [
-      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs"),
-      Path.home().join(".local/pkgs"),
-    ]
-  ) {
-    if (!path.isDirectory()) continue;
-    const dirs = [path];
-    let dir: Path | undefined;
-    while ((dir = dirs.pop()) != undefined) {
-      for await (const [path, { name, isDirectory, isSymlink }] of dir.ls()) {
-        if (!isDirectory || isSymlink) continue;
-        if (/^v\d+\./.test(name)) {
-          yield path;
-        } else {
-          dirs.push(path);
-        }
+  const root = install_prefix();
+  const path = root.join("pkgs");
+  if (!path.isDirectory()) return;
+  const dirs = [path];
+  let dir: Path | undefined;
+  while ((dir = dirs.pop()) != undefined) {
+    for await (const [path, { name, isDirectory, isSymlink }] of dir.ls()) {
+      if (!isDirectory || isSymlink) continue;
+      if (/^v\d+\./.test(name)) {
+        yield path;
+      } else {
+        dirs.push(path);
       }
     }
   }
@@ -570,13 +565,12 @@ async function uninstall(arg: string) {
         "color:yellow",
       );
     } else if (
-      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(
-        found.project,
-      ).isDirectory()
+      root.join(found.project).isDirectory()
     ) {
-      const prefix = Deno.env.get("PKGM_PREFIX") || "/usr/local";
       console.error(
-        `%c! rerun as \`sudo\` to uninstall ${prefix}/pkgs/${found.project}`,
+        `%c! rerun as \`sudo\` to uninstall ${
+          root.join("pkgs", found.project)
+        }`,
         "color:yellow",
       );
     }
@@ -728,11 +722,10 @@ async function update() {
 
   for (const pkgspec of update_list) {
     const pkg = utils.pkg.parse(pkgspec);
+    const prefix = install_prefix();
     console.log(
       "updating:",
-      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(
-        pkg.project,
-      ),
+      prefix.join("pkgs", pkg.project),
       "to",
       pkg.constraint.single(),
     );

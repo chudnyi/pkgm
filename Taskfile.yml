@@ -79,6 +79,8 @@ tasks:
 #      - "! test -f /usr/local/bin/git"
 #      - "! test -f ~/.local/bin/git"
       - ./pkgm.ts ls | grep /tmp/test_prefix/pkgs/git-scm.org
+      # verify ls doesn't show packages from other locations
+      - "./pkgm.ts ls | grep -v -E '^/tmp/test_prefix/pkgs/' && exit 1 || true"
       - ./pkgm.ts rm git
       - test ! -f /tmp/test_prefix/bin/git
       # test with PKGM_PREFIX and shims
@@ -87,9 +89,14 @@ tasks:
       # test update functionality with PKGM_PREFIX
       - ./pkgm.ts i hyperfine@1.18
       - ./pkgm.ts outdated | grep hyperfine
+      # verify outdated doesn't show packages from other locations
+      - "./pkgm.ts outdated | grep -E 'is outdated.*(/usr/local|\\.local)' && exit 1 || true"
       - pkgx semverator satisfies '<1.19' "$(/tmp/test_prefix/bin/hyperfine --version | cut -f 2 -d ' ')"
       - ./pkgm.ts update
       - pkgx semverator satisfies '>=1.19' "$(/tmp/test_prefix/bin/hyperfine --version | cut -f 2 -d ' ')"
+      # verify update doesn't affect packages from other locations
+      - "test ! -f ~/.local/bin/hyperfine"
+      - echo "✅ Tests completed successfully"
   
   upstream-init:
     desc: Initialize upstream remote repository
