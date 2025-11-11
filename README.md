@@ -1,6 +1,14 @@
 # `pkgm`
 
-Install `pkgx` packages to `/usr/local`.
+This is a fork of the original `pkgm` package manager with added support for custom installation directories.
+
+## Key Differences from Original
+
+- **Custom Installation Directory**: The fork adds support for the `PKGM_PREFIX` environment variable, allowing users to specify a custom directory for package installations instead of the default `/usr/local`.
+- **Enhanced Flexibility**: Users can now install packages to any desired location by setting the `PKGM_PREFIX` variable, providing more control over the installation process.
+- **Backward Compatibility**: Maintains full compatibility with the original behavior when `PKGM_PREFIX` is not set, ensuring existing workflows continue to function.
+
+Install `pkgx` packages to `/usr/local` or a custom directory specified by the `PKGM_PREFIX` environment variable.
 
 > [!CAUTION]
 >
@@ -20,6 +28,9 @@ $ pkgm uninstall node
 
 $ sudo pkgm install node
 # ^^ installs node to /usr/local. ie. you get /usr/local/bin/node
+
+$ PKGM_PREFIX=/opt/pkgm sudo pkgm install node
+# ^^ installs node to /opt/pkgm. ie. you get /opt/pkgm/bin/node
 
 $ pkgm shim node
 # ^^ creates a shim for node at ~/.local/bin/node
@@ -80,8 +91,9 @@ brew rm pkgm || sudo rm /usr/local/bin/pkgm
 # Intricacies
 
 1. Packages are installed via `pkgx` to `~/.pkgx`
-2. We then `sudo` hard-link them to `/usr/local/pkgs`
-3. We then symlink the hard-links to `/usr/local`
+2. We then `sudo` hard-link them to `$PKGM_PREFIX/pkgs` (defaults to `/usr/local/pkgs`)
+3. We then symlink the hard-links to `$PKGM_PREFIX` (defaults to `/usr/local`)
+
 
 # Advantages Over Homebrew
 

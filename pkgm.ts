@@ -14,7 +14,8 @@ import { parseArgs } from "jsr:@std/cli@^1";
 const { hydrate } = plumbing;
 
 function standardPath() {
-  let path = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+  const pkgmPrefix = Deno.env.get("PKGM_PREFIX") || "/usr/local";
+  let path = `${pkgmPrefix}/bin:/usr/bin:/bin:/usr/sbin:/sbin`;
 
   // for pkgx installed via homebrew
   let homebrewPrefix = "";
@@ -243,9 +244,9 @@ async function shim(args: string[], basePath: string) {
         if (!entry.isFile && !entry.isSymlink) continue;
         const name = entry.name;
         const quick_shim = Deno.build.os == "darwin" &&
-          pkgx == "/usr/local/bin/pkgx";
+          pkgx == (Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/bin/pkgx";
         const interpreter = quick_shim
-          ? "/usr/local/bin/pkgx"
+          ? (Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/bin/pkgx"
           : "/usr/bin/env -S pkgx";
 
         const range = args_pkgs[pkg.pkg.project];
@@ -294,7 +295,8 @@ async function query_pkgx(
   set("PKGX_DIST_URL");
   set("XDG_DATA_HOME");
 
-  const needs_sudo_backwards = install_prefix().string == "/usr/local";
+  const needs_sudo_backwards = install_prefix().string == "/usr/local" &&
+    !Deno.env.get("PKGM_PREFIX");
   let cmd = needs_sudo_backwards ? "/usr/bin/sudo" : pkgx;
   if (needs_sudo_backwards) {
     if (!Deno.env.get("SUDO_USER")) {
@@ -519,7 +521,10 @@ function get_pkgx() {
 
 async function* ls() {
   for (
-    const path of [new Path("/usr/local/pkgs"), Path.home().join(".local/pkgs")]
+    const path of [
+      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs"),
+      Path.home().join(".local/pkgs"),
+    ]
   ) {
     if (!path.isDirectory()) continue;
     const dirs = [path];
@@ -557,16 +562,21 @@ async function uninstall(arg: string) {
   if (!dir.isDirectory()) {
     console.error(`not installed: ${dir}`);
     if (
-      root.string == "/usr/local" &&
+      root.string == "/usr/local" && !Deno.env.get("PKGM_PREFIX") &&
       Path.home().join(".local/pkgs", found.project).isDirectory()
     ) {
       console.error(
         `%c! rerun without \`sudo\` to uninstall ~/.local/pkgs/${found.project}`,
         "color:yellow",
       );
-    } else if (new Path("/usr/local/pkgs").join(found.project).isDirectory()) {
+    } else if (
+      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(
+        found.project,
+      ).isDirectory()
+    ) {
+      const prefix = Deno.env.get("PKGM_PREFIX") || "/usr/local";
       console.error(
-        `%c! rerun as \`sudo\` to uninstall /usr/local/pkgs/${found.project}`,
+        `%c! rerun as \`sudo\` to uninstall ${prefix}/pkgs/${found.project}`,
         "color:yellow",
       );
     }
@@ -632,10 +642,8 @@ function writable(path: string) {
 
 async function outdated() {
   const pkgs: Installation[] = [];
-  for await (const pkg of walk_pkgs(new Path("/usr/local/pkgs"))) {
-    pkgs.push(pkg);
-  }
-  for await (const pkg of walk_pkgs(Path.home().join(".local/pkgs"))) {
+  const root = install_prefix();
+  for await (const pkg of walk_pkgs(root.join("pkgs"))) {
     pkgs.push(pkg);
   }
 
@@ -722,7 +730,9 @@ async function update() {
     const pkg = utils.pkg.parse(pkgspec);
     console.log(
       "updating:",
-      new Path("/usr/local/pkgs").join(pkg.project),
+      new Path((Deno.env.get("PKGM_PREFIX") || "/usr/local") + "/pkgs").join(
+        pkg.project,
+      ),
       "to",
       pkg.constraint.single(),
     );
@@ -732,6 +742,11 @@ async function update() {
 }
 
 function install_prefix() {
+  // Check if PKGM_PREFIX environment variable is set
+  const pkgmPrefix = Deno.env.get("PKGM_PREFIX");
+  if (pkgmPrefix) {
+    return new Path(pkgmPrefix);
+  }
   // if /usr/local is writable, use that
   if (writable("/usr/local")) {
     return new Path("/usr/local");
@@ -741,10 +756,11 @@ function install_prefix() {
 }
 
 function dev_stub_text(selfpath: string, bin_prefix: string, name: string) {
-  if (selfpath.startsWith("/usr/local") && selfpath != "/usr/local/bin/dev") {
+  const prefix = Deno.env.get("PKGM_PREFIX") || "/usr/local";
+  if (selfpath.startsWith(prefix) && selfpath != prefix + "/bin/dev") {
     return `
 dev_check() {
-  [ -x /usr/local/bin/dev ] || return 1
+  [ -x ${prefix}/bin/dev ] || return 1
   local d="$PWD"
   until [ "$d" = / ]; do
     if [ -f "${datadir()}/pkgx/dev/$d/dev.pkgx.activated" ]; then
@@ -757,7 +773,7 @@ dev_check() {
 }
 
 if d="$(dev_check)"; then
-  eval "$(/usr/local/bin/dev "$d" 2>/dev/null)"
+  eval "$(${prefix}/bin/dev "$d" 2>/dev/null)"
   [ "$(command -v ${name} 2>/dev/null)" != "${selfpath}" ] && exec ${name} "$@"
 fi
 

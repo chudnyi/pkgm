@@ -1,0 +1,92 @@
+# https://taskfile.dev
+version: '3'
+
+tasks:
+  fmt:
+    cmds:
+      - deno fmt pkgm.ts
+  lint:
+    cmds:
+      - deno fmt --check pkgm.ts
+      - deno lint pkgm.ts
+      - deno check pkgm.ts
+  test:
+    cmds:
+      - ./pkgm.ts i git
+      - ~/.local/bin/git --version
+      - "! test -f /usr/local/bin/git"
+      - ./pkgm.ts ls | grep .local/pkgs/git-scm.org
+      - ./pkgm.ts rm git
+      - test ! -f ~/.local/bin/git
+      - ./pkgm.ts i pkgx.sh/brewkit
+      - ~/.local/bin/bk --help
+      # check repeats work
+      - rm ~/.local/bin/bk
+      - test ! -f /usr/local/bin/bk
+      - ./pkgm.ts i pkgx.sh/brewkit
+      - ~/.local/bin/bk --help
+      - ./pkgm.ts i gum
+      - ~/.local/bin/gum --version
+      # test a thing with deps
+      # https://github.com/pkgxdev/pkgm/issues/24
+      - ./pkgm.ts i curl
+      - ~/.local/bin/curl -L pkgx.sh
+      - ./pkgm.ts shim semverator
+      - ~/.local/bin/semverator validate 1.0.0
+      # tests shims do not shim deps
+      - ./pkgm.ts shim node@20
+      - test ! -d ~/.local/bin/openssl
+      - if [[ $(~/.local/bin/node --version) != v20* ]]; then false; fi
+      - ./pkgm.ts i hyperfine@1.18
+      - ./pkgm.ts outdated | grep hyperfine
+      - if pkgx semverator satisfies '>=1.19' "$(hyperfine --version | cut -f 2 -d ' ')"; then false; fi
+      - ./pkgm.ts update
+      - pkgx semverator satisfies '>=1.19' "$(hyperfine --version | cut -f 2 -d ' ')"
+      # verifies that libpkgx is creating the pantry at the right place
+      # Refs: https://github.com/pkgxdev/pkgm/issues/59
+      - |
+        export XDG_DATA_HOME=/tmp/foo
+        ./pkgm.ts i semverator
+        if test -d /tmp/foo/pkgx; then
+          test $(uname) = Linux
+        else
+          test $(uname) = Darwin
+        fi
+
+      - |
+        set -x
+        export XDG_DATA_HOME=/tmp/bar
+        sudo ./pkgm.ts i node@22 dev
+        [[ $(node --version) = v22* ]] || exit 2
+        mkdir foo
+        cd foo
+        echo "dependencies: node@20" > pkgx.yaml
+        mkdir -p /tmp/bar/pkgx/dev$PWD/
+        touch /tmp/bar/pkgx/dev$PWD/dev.pkgx.activated   # `dev .` doesn't work in CI (fix in dev^2)
+        [[ $(node --version) = v20* ]] || exit 3
+      # https://github.com/pkgxdev/pkgm/issues/62
+      - |
+        ./pkgm.ts i spotify_player
+        spotify_player --version
+  test-pkgm-prefix:
+    env:
+      PKGM_PREFIX: /tmp/test_prefix
+      PATH:
+        sh: echo "/tmp/test_prefix/bin:$PATH"
+    cmds:
+      - ./pkgm.ts i git
+      - /tmp/test_prefix/bin/git --version
+#      - "! test -f /usr/local/bin/git"
+#      - "! test -f ~/.local/bin/git"
+      - ./pkgm.ts ls | grep /tmp/test_prefix/pkgs/git-scm.org
+      - ./pkgm.ts rm git
+      - test ! -f /tmp/test_prefix/bin/git
+      # test with PKGM_PREFIX and shims
+      - ./pkgm.ts shim semverator
+      - /tmp/test_prefix/bin/semverator validate 1.0.0
+      # test update functionality with PKGM_PREFIX
+      - ./pkgm.ts i hyperfine@1.18
+      - ./pkgm.ts outdated | grep hyperfine
+      - pkgx semverator satisfies '<1.19' "$(/tmp/test_prefix/bin/hyperfine --version | cut -f 2 -d ' ')"
+      - ./pkgm.ts update
+      - pkgx semverator satisfies '>=1.19' "$(/tmp/test_prefix/bin/hyperfine --version | cut -f 2 -d ' ')"

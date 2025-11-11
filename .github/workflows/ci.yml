@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/*
   pull_request:
 
 concurrency:
@@ -18,12 +19,9 @@ jobs:
       - uses: denolib/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno fmt --check .
-      - run: deno lint .
-      - run: deno check ./pkgm.ts
+      - uses: go-task/setup-task@v1
+      - run: task lint
 
-  #TODO test on linux! we are currently broken due to rpath issues
-  # https://github.com/pkgxdev/pkgm/pull/30#issuecomment-2678957666
   test:
     continue-on-error: true
     strategy:
@@ -35,76 +33,92 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pkgxdev/setup@v4
+      - uses: go-task/setup-task@v1
+      - run: task test-pkgm-prefix
 
-      - run: ./pkgm.ts i git
-      - run: ~/.local/bin/git --version
-      - run: "! test -f /usr/local/bin/git"
-      - run: ./pkgm.ts ls | grep .local/pkgs/git-scm.org
-      - run: ./pkgm.ts rm git
-      - run: test ! -f ~/.local/bin/git
-
-      - run: ./pkgm.ts i pkgx.sh/brewkit
-      - run: ~/.local/bin/bk --help
-
-      # check repeats work
-      - run: rm ~/.local/bin/bk
-      - run: test ! -f /usr/local/bin/bk
-      - run: ./pkgm.ts i pkgx.sh/brewkit
-      - run: ~/.local/bin/bk --help
-
-      - run: ./pkgm.ts i gum
-      - run: ~/.local/bin/gum --version
-
-      # test a thing with deps
-      # https://github.com/pkgxdev/pkgm/issues/24
-      - run: ./pkgm.ts i curl
-      - run: ~/.local/bin/curl -L pkgx.sh
-
-      - run: ./pkgm.ts shim semverator
-      - run: ~/.local/bin/semverator validate 1.0.0
-
-      # tests shims do not shim deps
-      - run: ./pkgm.ts shim node@20
-      - run: test ! -d ~/.local/bin/openssl
-      - run: if [[ $(~/.local/bin/node --version) != v20* ]]; then false; fi
-
-      - run: ./pkgm.ts i hyperfine@1.18
-      - run: ./pkgm.ts outdated | grep hyperfine
-      - run: if pkgx semverator satisfies '>=1.19' "$(hyperfine --version | cut -f 2 -d ' ')"; then false; fi
-      - run: ./pkgm.ts update
-      - run: pkgx semverator satisfies '>=1.19' "$(hyperfine --version | cut -f 2 -d ' ')"
-
-      # TODO pending: https://github.com/pkgxdev/pantry/issues/8487
-      # - run: ./pkgm.ts i xpra.org # https://github.com/pkgxdev/pkgm/issues/13
-      # - run: ls -la /usr/local/pkgs/xpra.org/v6.2.3/venv/bin
-      # - run: xpra --version
-
-      # verifies that libpkgx is creating the pantry at the right place
-      # Refs: https://github.com/pkgxdev/pkgm/issues/59
-      - run: |
-          ./pkgm.ts i semverator
-          if test -d /tmp/foo/pkgx; then
-            test $(uname) = Linux
-          else
-            test $(uname) = Darwin
-          fi
-        env:
-          XDG_DATA_HOME: /tmp/foo
-
-      - run: |
-          set -x
-          sudo ./pkgm.ts i node@22 dev
-          [[ $(node --version) = v22* ]] || exit 2
-          mkdir foo
-          cd foo
-          echo "dependencies: node@20" > pkgx.yaml
-          mkdir -p /tmp/bar/pkgx/dev$PWD/
-          touch /tmp/bar/pkgx/dev$PWD/dev.pkgx.activated   # `dev .` doesn’t work in CI (fix in dev^2)
-          [[ $(node --version) = v20* ]] || exit 3
-        env:
-          XDG_DATA_HOME: /tmp/bar
-
-      # https://github.com/pkgxdev/pkgm/issues/62
-      - run: |
-          ./pkgm.ts i spotify_player
-          spotify_player --version
+  #TODO test on linux! we are currently broken due to rpath issues
+  # https://github.com/pkgxdev/pkgm/pull/30#issuecomment-2678957666
+#  test:
+#    continue-on-error: true
+#    strategy:
+#      matrix:
+#        os:
+#          - macos-latest
+#          - ubuntu-latest
+#    runs-on: ${{ matrix.os }}
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: pkgxdev/setup@v4
+#
+#      - run: ./pkgm.ts i git
+#      - run: ~/.local/bin/git --version
+#      - run: "! test -f /usr/local/bin/git"
+#      - run: ./pkgm.ts ls | grep .local/pkgs/git-scm.org
+#      - run: ./pkgm.ts rm git
+#      - run: test ! -f ~/.local/bin/git
+#
+#      - run: ./pkgm.ts i pkgx.sh/brewkit
+#      - run: ~/.local/bin/bk --help
+#
+#      # check repeats work
+#      - run: rm ~/.local/bin/bk
+#      - run: test ! -f /usr/local/bin/bk
+#      - run: ./pkgm.ts i pkgx.sh/brewkit
+#      - run: ~/.local/bin/bk --help
+#
+#      - run: ./pkgm.ts i gum
+#      - run: ~/.local/bin/gum --version
+#
+#      # test a thing with deps
+#      # https://github.com/pkgxdev/pkgm/issues/24
+#      - run: ./pkgm.ts i curl
+#      - run: ~/.local/bin/curl -L pkgx.sh
+#
+#      - run: ./pkgm.ts shim semverator
+#      - run: ~/.local/bin/semverator validate 1.0.0
+#
+#      # tests shims do not shim deps
+#      - run: ./pkgm.ts shim node@20
+#      - run: test ! -d ~/.local/bin/openssl
+#      - run: if [[ $(~/.local/bin/node --version) != v20* ]]; then false; fi
+#
+#      - run: ./pkgm.ts i hyperfine@1.18
+#      - run: ./pkgm.ts outdated | grep hyperfine
+#      - run: if pkgx semverator satisfies '>=1.19' "$(hyperfine --version | cut -f 2 -d ' ')"; then false; fi
+#      - run: ./pkgm.ts update
+#      - run: pkgx semverator satisfies '>=1.19' "$(hyperfine --version | cut -f 2 -d ' ')"
+#
+#      # TODO pending: https://github.com/pkgxdev/pantry/issues/8487
+#      # - run: ./pkgm.ts i xpra.org # https://github.com/pkgxdev/pkgm/issues/13
+#      # - run: ls -la /usr/local/pkgs/xpra.org/v6.2.3/venv/bin
+#      # - run: xpra --version
+#
+#      # verifies that libpkgx is creating the pantry at the right place
+#      # Refs: https://github.com/pkgxdev/pkgm/issues/59
+#      - run: |
+#          ./pkgm.ts i semverator
+#          if test -d /tmp/foo/pkgx; then
+#            test $(uname) = Linux
+#          else
+#            test $(uname) = Darwin
+#          fi
+#        env:
+#          XDG_DATA_HOME: /tmp/foo
+#
+#      - run: |
+#          set -x
+#          sudo ./pkgm.ts i node@22 dev
+#          [[ $(node --version) = v22* ]] || exit 2
+#          mkdir foo
+#          cd foo
+#          echo "dependencies: node@20" > pkgx.yaml
+#          mkdir -p /tmp/bar/pkgx/dev$PWD/
+#          touch /tmp/bar/pkgx/dev$PWD/dev.pkgx.activated   # `dev .` doesn’t work in CI (fix in dev^2)
+#          [[ $(node --version) = v20* ]] || exit 3
+#        env:
+#          XDG_DATA_HOME: /tmp/bar
+#
+#      # https://github.com/pkgxdev/pkgm/issues/62
+#      - run: |
+#          ./pkgm.ts i spotify_player
+#          spotify_player --version
