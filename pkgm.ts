@@ -13,30 +13,6 @@ import { ensureDir, existsSync, walk } from "jsr:@std/fs@^1";
 import { parseArgs } from "jsr:@std/cli@^1";
 const { hydrate } = plumbing;
 
-function standardPath() {
-  const pkgmPrefix = Deno.env.get("PKGM_PREFIX") || "/usr/local";
-  let path = `${pkgmPrefix}/bin:/usr/bin:/bin:/usr/sbin:/sbin`;
-
-  // for pkgx installed via homebrew
-  let homebrewPrefix = "";
-  switch (Deno.build.os) {
-    case "darwin":
-      homebrewPrefix = "/opt/homebrew"; // /usr/local is already in the path
-      break;
-    case "linux":
-      homebrewPrefix = `/home/linuxbrew/.linuxbrew:${
-        Deno.env.get("HOME")
-      }/.linuxbrew`;
-      break;
-  }
-  if (homebrewPrefix) {
-    homebrewPrefix = Deno.env.get("HOMEBREW_PREFIX") ?? homebrewPrefix;
-    path = `${homebrewPrefix}/bin:${path}`;
-  }
-
-  return path;
-}
-
 const parsedArgs = parseArgs(Deno.args, {
   alias: {
     v: "version",
@@ -282,18 +258,7 @@ async function query_pkgx(
 ): Promise<[JsonResponse, Record<string, string>]> {
   args = args.map((x) => `+${x}`);
 
-  const env: Record<string, string> = {
-    "PATH": standardPath(),
-  };
-  const set = (key: string) => {
-    const x = Deno.env.get(key);
-    if (x) env[key] = x;
-  };
-  set("HOME");
-  set("PKGX_DIR");
-  set("PKGX_PANTRY_DIR");
-  set("PKGX_DIST_URL");
-  set("XDG_DATA_HOME");
+  const env = Deno.env.toObject();
 
   const needs_sudo_backwards = install_prefix().string == "/usr/local" &&
     !Deno.env.get("PKGM_PREFIX");
